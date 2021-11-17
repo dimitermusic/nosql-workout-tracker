@@ -13,7 +13,14 @@ app.use(express.json());
 
 app.use(express.static("public"));
 
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/workoutdb", { useNewUrlParser: true });
+mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/workoutdb",
+    {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+        useCreateIndex: true,
+        useFindAndModify: false
+    }
+);
 
 app.use(routes);
 
@@ -26,7 +33,7 @@ app.post("/api/workouts", (req, res) => {
         workout.exercises = [];
     }
     db.Workout.create(workout)
-        .then((err,data) => {
+        .then((err, data) => {
             if (err) {
                 res.send(err);
             } else {
@@ -37,7 +44,7 @@ app.post("/api/workouts", (req, res) => {
 
 // READ: gets all workouts from Mongo database
 app.get("/api/workouts", (req, res) => {
-    db.Workout.find({}, (err, data) =>{
+    db.Workout.find({}, (err, data) => {
         if (err) {
             res.send(error);
         } else {
@@ -57,8 +64,8 @@ app.get("/api/workouts", (req, res) => {
 });
 // gets the past seven workouts in descending order by id
 app.get("/api/workouts/range", (req, res) => {
-    db.Workout.find().sort({_id: -1}).limit(7).exec((err,data) => {
-        if(err) {
+    db.Workout.find().sort({ _id: -1 }).limit(7).exec((err, data) => {
+        if (err) {
             res.send(err);
         } else {
             res.json(data);
@@ -68,20 +75,20 @@ app.get("/api/workouts/range", (req, res) => {
 
 // UPDATE: adds an exercise to the existing workout
 app.put("/api/workouts/:id", (req, res) => {
-    db.Workout.updateOne({_id: mongojs.ObjectId(req.params.id)},{$push:{exercises:req.body}}, (err, data) =>{
+    db.Workout.updateOne({ _id: mongojs.ObjectId(req.params.id) }, { $push: { exercises: req.body } }, (err, data) => {
         if (err) {
             res.send(error);
         } else {
             res.send(data);
         }
     }).then(() => {
-        db.Workout.findOne({_id: mongojs.ObjectId(req.params.id)}, (err, data) =>{
+        db.Workout.findOne({ _id: mongojs.ObjectId(req.params.id) }, (err, data) => {
             let totalDuration = 0;
             for (let i = 0; i < data.exercises.length; i++) {
                 totalDuration += data.exercises[i].duration;
             }
             const number = totalDuration;
-            db.Workout.updateOne({_id: mongojs.ObjectId(req.params.id)},{$set:{totalDuration:number}}, (err,data) => {
+            db.Workout.updateOne({ _id: mongojs.ObjectId(req.params.id) }, { $set: { totalDuration: number } }, (err, data) => {
                 if (err) {
                     console.log(err);
                 } else {
@@ -93,5 +100,5 @@ app.put("/api/workouts/:id", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`App running on port ${PORT}!`);
+    console.log(`App running on port ${PORT}!`);
 });
