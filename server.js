@@ -1,104 +1,95 @@
 const express = require("express");
-const mongojs = require('mongojs');
+const logger = require("morgan");
 const mongoose = require("mongoose");
-const db = require("./models");
-const routes = require('./routes');
+const path = require('path')
 
 const PORT = process.env.PORT || 3000;
 
+const db = require("./models");
+const {Workout} = require("./models");
+
 const app = express();
+
+app.use(logger("dev"));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 app.use(express.static("public"));
 
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/workoutdb",
-    {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        useCreateIndex: true,
-        useFindAndModify: false
-    }
-);
-
-app.use(routes);
-
-// CREATE: adds new document to Mongo database
-app.post("/api/workouts", (req, res) => {
-    const workout = req.body;
-    console.log(workout);
-    if (workout) {
-        workout.day = new Date(new Date().setDate(new Date().getDate()));
-        workout.exercises = [];
-    }
-    db.Workout.create(workout)
-        .then((err, data) => {
-            if (err) {
-                res.send(err);
-            } else {
-                res.json(data);
-            }
-        });
+mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/workout", 
+{ 
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    useCreateIndex: true,
+    useFindAndModify: false
 });
 
-// READ: gets all workouts from Mongo database
-app.get("/api/workouts", (req, res) => {
-    db.Workout.find({}, (err, data) => {
-        if (err) {
-            res.send(error);
-        } else {
-            if (data) {
-                for (let i = 0; i < data.length; i++) {
-                    const exercisesArr = data[i].exercises;
-                    let totalDuration = 0;
-                    for (let i = 0; i < exercisesArr.length; i++) {
-                        totalDuration += exercisesArr[i].duration;
-                    }
-                    data[i].totalDuration = totalDuration;
-                }
-                res.send(data);
+app.get('/stats',(req,res) => {
+    res.sendFile(path.join(__dirname,'public/stats.html'))
+});
+
+app.get('/exercise',(req,res) => {
+    res.sendFile(path.join(__dirname,'public/exercise.html'))
+});
+
+app.get("/api/workouts", (req,res) => {
+    db.Workout.aggregate([
+        {
+            $addFields:{
+                totalDuration:{$sum: '$exercises.duration'}
             }
         }
-    });
+    ])
+    .then(result => {
+        res.json(result)
+    })
+    .catch(err => {
+        console.log(err)
+    })
 });
-// gets the past seven workouts in descending order by id
-app.get("/api/workouts/range", (req, res) => {
-    db.Workout.find().sort({ _id: -1 }).limit(7).exec((err, data) => {
-        if (err) {
-            res.send(err);
-        } else {
-            res.json(data);
-        }
+
+app.post("/api/workouts",({body},res) => {
+    const exercise = new Workout(body);
+    db.Workout.create(exercise)
+    .then(dbWorkout => {
+      res.json(dbWorkout);
+    })
+    .catch(err => {
+      res.json(err);
     });
 });
 
-// UPDATE: adds an exercise to the existing workout
-app.put("/api/workouts/:id", (req, res) => {
-    db.Workout.updateOne({ _id: mongojs.ObjectId(req.params.id) }, { $push: { exercises: req.body } }, (err, data) => {
-        if (err) {
-            res.send(error);
-        } else {
-            res.send(data);
-        }
-    }).then(() => {
-        db.Workout.findOne({ _id: mongojs.ObjectId(req.params.id) }, (err, data) => {
-            let totalDuration = 0;
-            for (let i = 0; i < data.exercises.length; i++) {
-                totalDuration += data.exercises[i].duration;
+app.put("/api/workouts/:id", (req,res) => {
+    db.Workout.findByIdAndUpdate(req.params.id,{$push:{exercises:req.body}},{new:true,runValidators:true})
+    .then(dbWorkout => {
+        console.log(dbWorkout)
+        res.json(dbWorkout);
+    })
+    .catch(err => {
+        res.json(err)
+    })
+});
+
+app.get("/api/workouts/range", (req,res)=>{
+    db.Workout.aggregate([
+        {
+            $addFields:{
+                totalDuration:{$sum: '$exercises.duration'}
             }
-            const number = totalDuration;
-            db.Workout.updateOne({ _id: mongojs.ObjectId(req.params.id) }, { $set: { totalDuration: number } }, (err, data) => {
-                if (err) {
-                    console.log(err);
-                } else {
-                    console.log(data);
-                }
-            });
-        });
-    });
+        }
+    ])
+    .sort({day: -1})
+    .limit(7)
+    .then(result => {
+        res.json(result)
+    })
+    .catch(err => {
+        console.log(err)
+    })
 });
 
 app.listen(PORT, () => {
     console.log(`App running on port ${PORT}!`);
 });
+  
