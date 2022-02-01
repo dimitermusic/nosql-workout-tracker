@@ -14,7 +14,7 @@ A simple workout tracking app that uses MongoDB to store data.
   - [Questions](#questions)
 
 ## Installation
-Visit the deplpoyed app [here!](https://dimiter-workout-tracker.herokuapp.com/)
+Visit the deployed app [here!](https://dimiter-workout-tracker.herokuapp.com/)
 
 ## Usage
 ### Screenshots (Desktop and Mobile)
